@@ -130,7 +130,7 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up sensors from a config entry."""
-    config = entry.data
+    config = {**entry.data, **entry.options}
     interval = config.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)
     entities: list[SensorEntity] = []
 

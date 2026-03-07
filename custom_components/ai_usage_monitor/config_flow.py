@@ -163,10 +163,36 @@ class AIUsageMonitorOptionsFlow(config_entries.OptionsFlow):
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
         """Manage the options."""
-        if user_input is not None:
-            return self.async_create_entry(title="", data=user_input)
+        errors: dict[str, str] = {}
 
-        current = self.config_entry.data
+        if user_input is not None:
+            cursor_cookie = user_input.get(CONF_CURSOR_COOKIE, "").strip()
+            claude_cookie = user_input.get(CONF_CLAUDE_COOKIE, "").strip()
+            claude_org_id = user_input.get(CONF_CLAUDE_ORG_ID, "").strip()
+
+            if not cursor_cookie and not claude_cookie:
+                errors["base"] = "no_services"
+            else:
+                if cursor_cookie:
+                    valid, error_key = await _test_cursor_cookie(cursor_cookie)
+                    if not valid:
+                        errors[CONF_CURSOR_COOKIE] = error_key
+
+                if not errors:
+                    return self.async_create_entry(
+                        title="",
+                        data={
+                            CONF_CURSOR_COOKIE: cursor_cookie,
+                            CONF_CLAUDE_COOKIE: claude_cookie,
+                            CONF_CLAUDE_ORG_ID: claude_org_id,
+                            CONF_SCAN_INTERVAL: user_input.get(
+                                CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL
+                            ),
+                        },
+                    )
+
+        current = {**self.config_entry.data, **self.config_entry.options}
+        form_defaults = user_input or current
 
         return self.async_show_form(
             step_id="init",
@@ -174,20 +200,21 @@ class AIUsageMonitorOptionsFlow(config_entries.OptionsFlow):
                 {
                     vol.Optional(
                         CONF_CURSOR_COOKIE,
-                        default=current.get(CONF_CURSOR_COOKIE, ""),
+                        default=form_defaults.get(CONF_CURSOR_COOKIE, ""),
                     ): str,
                     vol.Optional(
                         CONF_CLAUDE_COOKIE,
-                        default=current.get(CONF_CLAUDE_COOKIE, ""),
+                        default=form_defaults.get(CONF_CLAUDE_COOKIE, ""),
                     ): str,
                     vol.Optional(
                         CONF_CLAUDE_ORG_ID,
-                        default=current.get(CONF_CLAUDE_ORG_ID, ""),
+                        default=form_defaults.get(CONF_CLAUDE_ORG_ID, ""),
                     ): str,
                     vol.Optional(
                         CONF_SCAN_INTERVAL,
-                        default=current.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL),
+                        default=form_defaults.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL),
                     ): vol.All(vol.Coerce(int), vol.Range(min=60, max=3600)),
                 }
             ),
+            errors=errors,
         )
