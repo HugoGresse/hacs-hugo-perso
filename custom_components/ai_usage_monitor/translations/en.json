@@ -20,7 +20,8 @@
     },
     "error": {
       "no_services": "At least one service (Cursor or Claude) must be configured",
-      "invalid_cursor_cookie": "Could not authenticate with Cursor. Check your cookie."
+      "invalid_cursor_cookie": "Could not authenticate with Cursor. Check your cookie.",
+      "cursor_connection_error": "Could not connect to Cursor. Check your network and try again."
     }
   },
   "options": {

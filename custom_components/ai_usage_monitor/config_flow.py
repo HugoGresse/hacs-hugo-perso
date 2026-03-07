@@ -24,8 +24,8 @@ from .const import (
 _LOGGER = logging.getLogger(__name__)
 
 
-async def _test_cursor_cookie(cookie: str) -> bool:
-    """Test if the Cursor cookie is valid."""
+async def _test_cursor_cookie(cookie: str) -> tuple[bool, str | None]:
+    """Test if the Cursor cookie is valid. Returns (success, error_key)."""
     try:
         async with aiohttp.ClientSession() as session:
             headers = {
@@ -35,12 +35,24 @@ async def _test_cursor_cookie(cookie: str) -> bool:
             async with session.post(
                 CURSOR_USAGE_URL, headers=headers, json={}, timeout=aiohttp.ClientTimeout(total=10)
             ) as resp:
+                _LOGGER.debug("Cursor API response status: %s", resp.status)
                 if resp.status == 200:
                     data = await resp.json()
-                    return "planUsage" in data
-                return False
-    except Exception:
-        return False
+                    _LOGGER.debug("Cursor API response keys: %s", list(data.keys()))
+                    if "planUsage" in data:
+                        return True, None
+                    _LOGGER.debug("Cursor API response missing 'planUsage' key")
+                    return False, "invalid_cursor_cookie"
+                _LOGGER.debug(
+                    "Cursor API returned HTTP %s (authentication failed)", resp.status
+                )
+                return False, "invalid_cursor_cookie"
+    except aiohttp.ClientError as err:
+        _LOGGER.debug("Cursor API connection error: %s", err)
+        return False, "cursor_connection_error"
+    except Exception as err:
+        _LOGGER.debug("Unexpected error testing Cursor cookie: %s", err)
+        return False, "cursor_connection_error"
 
 
 class AIUsageMonitorConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
@@ -64,9 +76,9 @@ class AIUsageMonitorConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             else:
                 # Test Cursor cookie if provided
                 if cursor_cookie:
-                    valid = await _test_cursor_cookie(cursor_cookie)
+                    valid, error_key = await _test_cursor_cookie(cursor_cookie)
                     if not valid:
-                        errors[CONF_CURSOR_COOKIE] = "invalid_cursor_cookie"
+                        errors[CONF_CURSOR_COOKIE] = error_key
 
                 if not errors:
                     await self.async_set_unique_id("ai_usage_monitor")
@@ -84,15 +96,26 @@ class AIUsageMonitorConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         },
                     )
 
+        existing = user_input or {}
         return self.async_show_form(
             step_id="user",
             data_schema=vol.Schema(
                 {
-                    vol.Optional(CONF_CURSOR_COOKIE, default=""): str,
-                    vol.Optional(CONF_CLAUDE_COOKIE, default=""): str,
-                    vol.Optional(CONF_CLAUDE_ORG_ID, default=""): str,
                     vol.Optional(
-                        CONF_SCAN_INTERVAL, default=DEFAULT_SCAN_INTERVAL
+                        CONF_CURSOR_COOKIE,
+                        default=existing.get(CONF_CURSOR_COOKIE, ""),
+                    ): str,
+                    vol.Optional(
+                        CONF_CLAUDE_COOKIE,
+                        default=existing.get(CONF_CLAUDE_COOKIE, ""),
+                    ): str,
+                    vol.Optional(
+                        CONF_CLAUDE_ORG_ID,
+                        default=existing.get(CONF_CLAUDE_ORG_ID, ""),
+                    ): str,
+                    vol.Optional(
+                        CONF_SCAN_INTERVAL,
+                        default=existing.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL),
                     ): vol.All(vol.Coerce(int), vol.Range(min=60, max=3600)),
                 }
             ),
