@@ -36,10 +36,10 @@ async def _test_cursor_cookie(cookie: str) -> tuple[bool, str | None]:
             ) as resp:
                 _LOGGER.debug("Cursor API response status: %s", resp.status)
                 if resp.status == 200:
+                    body = await resp.text()
                     try:
                         data = await resp.json(content_type=None)
-                    except (aiohttp.ContentTypeError, json.JSONDecodeError) as json_err:
-                        body = await resp.text()
+                    except json.JSONDecodeError as json_err:
                         _LOGGER.debug(
                             "Cursor API returned non-JSON body (json_err=%s): %s",
                             json_err,
