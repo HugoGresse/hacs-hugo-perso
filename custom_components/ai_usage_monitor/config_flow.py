@@ -1,6 +1,7 @@
 """Config flow for AI Usage Monitor."""
 from __future__ import annotations
 
+import json
 import logging
 from typing import Any
 
@@ -16,6 +17,7 @@ from .const import (
     CONF_CLAUDE_ORG_ID,
     CONF_CURSOR_COOKIE,
     CONF_SCAN_INTERVAL,
+    CURSOR_REQUEST_HEADERS,
     CURSOR_USAGE_URL,
     DEFAULT_SCAN_INTERVAL,
     DOMAIN,
@@ -28,16 +30,22 @@ async def _test_cursor_cookie(cookie: str) -> tuple[bool, str | None]:
     """Test if the Cursor cookie is valid. Returns (success, error_key)."""
     try:
         async with aiohttp.ClientSession() as session:
-            headers = {
-                "Content-Type": "application/json",
-                "Cookie": cookie,
-            }
+            headers = {**CURSOR_REQUEST_HEADERS, "Cookie": cookie}
             async with session.post(
                 CURSOR_USAGE_URL, headers=headers, json={}, timeout=aiohttp.ClientTimeout(total=10)
             ) as resp:
                 _LOGGER.debug("Cursor API response status: %s", resp.status)
                 if resp.status == 200:
-                    data = await resp.json()
+                    body = await resp.text()
+                    try:
+                        data = await resp.json(content_type=None)
+                    except json.JSONDecodeError as json_err:
+                        _LOGGER.debug(
+                            "Cursor API returned non-JSON body (json_err=%s): %s",
+                            json_err,
+                            body[:200],
+                        )
+                        return False, "invalid_cursor_cookie"
                     _LOGGER.debug("Cursor API response keys: %s", list(data.keys()))
                     if "planUsage" in data:
                         return True, None
