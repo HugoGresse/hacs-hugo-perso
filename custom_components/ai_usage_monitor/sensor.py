@@ -26,6 +26,7 @@ from .const import (
     CONF_CLAUDE_ORG_ID,
     CONF_CURSOR_COOKIE,
     CONF_SCAN_INTERVAL,
+    CURSOR_REQUEST_HEADERS,
     CURSOR_USAGE_URL,
     CLAUDE_USAGE_URL,
     DEFAULT_SCAN_INTERVAL,
@@ -38,12 +39,7 @@ _LOGGER = logging.getLogger(__name__)
 async def _fetch_cursor_usage(cookie: str) -> dict[str, Any]:
     """Fetch Cursor usage data."""
     async with aiohttp.ClientSession() as session:
-        headers = {
-            "Content-Type": "application/json",
-            "Origin": "https://cursor.com",
-            "Referer": "https://cursor.com/dashboard",
-            "Cookie": cookie,
-        }
+        headers = {**CURSOR_REQUEST_HEADERS, "Cookie": cookie}
         async with session.post(
             CURSOR_USAGE_URL,
             headers=headers,
@@ -52,7 +48,7 @@ async def _fetch_cursor_usage(cookie: str) -> dict[str, Any]:
         ) as resp:
             if resp.status != 200:
                 raise UpdateFailed(f"Cursor API returned status {resp.status}")
-            return await resp.json()
+            return await resp.json(content_type=None)
 
 
 async def _fetch_claude_usage(cookie: str, org_id: str) -> dict[str, Any]:
