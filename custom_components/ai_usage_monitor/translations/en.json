@@ -1,0 +1,39 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "AI Usage Monitor",
+        "description": "Configure your AI service cookies to monitor usage. At least one service must be configured.",
+        "data": {
+          "cursor_cookie": "Cursor Session Cookie",
+          "claude_cookie": "Claude Session Cookie",
+          "claude_org_id": "Claude Organization ID (optional)",
+          "scan_interval": "Update interval (seconds)"
+        },
+        "data_description": {
+          "cursor_cookie": "Full cookie string from cursor.com (must include WorkosCursorSessionToken)",
+          "claude_cookie": "Full cookie string from claude.ai (must include sessionKey)",
+          "claude_org_id": "Your Claude organization UUID (found in the URL on claude.ai)",
+          "scan_interval": "How often to poll for updates (60-3600 seconds)"
+        }
+      }
+    },
+    "error": {
+      "no_services": "At least one service (Cursor or Claude) must be configured",
+      "invalid_cursor_cookie": "Could not authenticate with Cursor. Check your cookie."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "AI Usage Monitor Options",
+        "data": {
+          "cursor_cookie": "Cursor Session Cookie",
+          "claude_cookie": "Claude Session Cookie",
+          "claude_org_id": "Claude Organization ID",
+          "scan_interval": "Update interval (seconds)"
+        }
+      }
+    }
+  }
+}
