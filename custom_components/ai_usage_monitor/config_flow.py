@@ -43,10 +43,23 @@ async def _test_cursor_cookie(cookie: str) -> tuple[bool, str | None]:
                         return True, None
                     _LOGGER.debug("Cursor API response missing 'planUsage' key")
                     return False, "invalid_cursor_cookie"
+                if resp.status in (401, 403):
+                    _LOGGER.debug(
+                        "Cursor API returned HTTP %s (invalid or expired cookie)", resp.status
+                    )
+                    return False, "cursor_auth_error"
+                if resp.status == 429:
+                    _LOGGER.debug("Cursor API returned HTTP 429 (rate limited)")
+                    return False, "cursor_rate_limited"
+                if resp.status >= 500:
+                    _LOGGER.debug(
+                        "Cursor API returned HTTP %s (server error)", resp.status
+                    )
+                    return False, "cursor_server_error"
                 _LOGGER.debug(
-                    "Cursor API returned HTTP %s (authentication failed)", resp.status
+                    "Cursor API returned unexpected HTTP %s", resp.status
                 )
-                return False, "invalid_cursor_cookie"
+                return False, "cursor_unknown_error"
     except aiohttp.ClientError as err:
         _LOGGER.debug("Cursor API connection error: %s", err)
         return False, "cursor_connection_error"
