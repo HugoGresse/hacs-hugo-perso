@@ -146,18 +146,23 @@ class AIUsageMonitorConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     @staticmethod
     @callback
     def async_get_options_flow(
-        config_entry: config_entries.ConfigEntry,
+        _config_entry: config_entries.ConfigEntry,
     ) -> AIUsageMonitorOptionsFlow:
         """Get the options flow."""
-        return AIUsageMonitorOptionsFlow(config_entry)
+        flow = AIUsageMonitorOptionsFlow()
+        # Backwards compatibility for Home Assistant versions that do not
+        # automatically set OptionsFlow.config_entry on instantiation.
+        try:
+            flow.config_entry = config_entry
+        except AttributeError:
+            # On newer HA versions, config_entry may be managed by the framework
+            # and could be a read-only attribute.
+            pass
+        return flow
 
 
 class AIUsageMonitorOptionsFlow(config_entries.OptionsFlow):
     """Handle options flow."""
-
-    def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
-        """Initialize options flow."""
-        self.config_entry = config_entry
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
