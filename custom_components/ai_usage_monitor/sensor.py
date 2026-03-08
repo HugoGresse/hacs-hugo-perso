@@ -138,7 +138,13 @@ async def async_setup_entry(
     cursor_cookie = config.get(CONF_CURSOR_COOKIE, "")
     if cursor_cookie:
         cursor_coordinator = CursorUsageCoordinator(hass, cursor_cookie, interval)
-        await cursor_coordinator.async_config_entry_first_refresh()
+        await cursor_coordinator.async_refresh()
+        if cursor_coordinator.last_exception:
+            _LOGGER.warning(
+                "Could not fetch initial Cursor usage data: %s. "
+                "Sensors will be unavailable until the next scheduled update.",
+                cursor_coordinator.last_exception,
+            )
 
         entities.extend(
             [
@@ -156,14 +162,15 @@ async def async_setup_entry(
         claude_coordinator = ClaudeUsageCoordinator(
             hass, claude_cookie, claude_org_id, interval
         )
-        try:
-            await claude_coordinator.async_config_entry_first_refresh()
-            entities.append(ClaudeUsageSensor(claude_coordinator, entry))
-        except UpdateFailed:
+        await claude_coordinator.async_refresh()
+        if claude_coordinator.last_exception:
             _LOGGER.warning(
-                "Could not fetch Claude usage data. "
-                "The internal API may have changed. Check your cookie and org ID."
+                "Could not fetch initial Claude usage data: %s. "
+                "The internal API may have changed. Check your cookie and org ID. "
+                "Sensor will be unavailable until the next scheduled update.",
+                claude_coordinator.last_exception,
             )
+        entities.append(ClaudeUsageSensor(claude_coordinator, entry))
 
     async_add_entities(entities, True)
 
@@ -196,10 +203,8 @@ class CursorBaseSensor(CoordinatorEntity, SensorEntity):
         self._attr_native_unit_of_measurement = unit
         self._attr_unique_id = f"{entry.entry_id}_cursor_{key}"
         self._attr_device_info = {
-            "identifiers": {(DOMAIN, f"{entry.entry_id}_cursor")},
-            "name": "Cursor",
-            "manufacturer": "Anysphere",
-            "model": "Cursor IDE",
+            "identifiers": {(DOMAIN, entry.entry_id)},
+            "name": "AI Providers",
             "entry_type": "service",
         }
 
@@ -349,10 +354,8 @@ class ClaudeUsageSensor(CoordinatorEntity, SensorEntity):
         self._attr_name = "Claude Usage"
         self._attr_unique_id = f"{entry.entry_id}_claude_usage"
         self._attr_device_info = {
-            "identifiers": {(DOMAIN, f"{entry.entry_id}_claude")},
-            "name": "Claude Code",
-            "manufacturer": "Anthropic",
-            "model": "Claude Pro/Max",
+            "identifiers": {(DOMAIN, entry.entry_id)},
+            "name": "AI Providers",
             "entry_type": "service",
         }
 
