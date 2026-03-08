@@ -149,7 +149,16 @@ class AIUsageMonitorConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         config_entry: config_entries.ConfigEntry,
     ) -> AIUsageMonitorOptionsFlow:
         """Get the options flow."""
-        return AIUsageMonitorOptionsFlow()
+        flow = AIUsageMonitorOptionsFlow()
+        # Backwards compatibility for Home Assistant versions that do not
+        # automatically set OptionsFlow.config_entry on instantiation.
+        try:
+            flow.config_entry = config_entry
+        except AttributeError:
+            # On newer HA versions, config_entry may be managed by the framework
+            # and could be a read-only attribute.
+            pass
+        return flow
 
 
 class AIUsageMonitorOptionsFlow(config_entries.OptionsFlow):
