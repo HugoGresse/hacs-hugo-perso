@@ -35,10 +35,25 @@
         "data": {
           "cursor_cookie": "Cursor Session Cookie",
           "claude_cookie": "Claude Session Cookie",
-          "claude_org_id": "Claude Organization ID",
+          "claude_org_id": "Claude Organization ID (optional)",
           "scan_interval": "Update interval (seconds)"
+        },
+        "data_description": {
+          "cursor_cookie": "Full cookie string from cursor.com (must include WorkosCursorSessionToken)",
+          "claude_cookie": "Full cookie string from claude.ai (must include sessionKey)",
+          "claude_org_id": "Your Claude organization UUID (found in the URL on claude.ai)",
+          "scan_interval": "How often to poll for updates (60-3600 seconds)"
         }
       }
+    },
+    "error": {
+      "no_services": "At least one service (Cursor or Claude) must be configured",
+      "invalid_cursor_cookie": "Could not authenticate with Cursor. Check your cookie.",
+      "cursor_auth_error": "Cursor rejected the cookie (HTTP 401/403). The cookie may be invalid or expired.",
+      "cursor_rate_limited": "Cursor rate-limited this request (HTTP 429). Please wait a moment and try again.",
+      "cursor_server_error": "Cursor returned a server error (HTTP 5xx). Try again later.",
+      "cursor_unknown_error": "Cursor returned an unexpected response. Check your cookie and try again.",
+      "cursor_connection_error": "Could not connect to Cursor. Check your network and try again."
     }
   }
 }
