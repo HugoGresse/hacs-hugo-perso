@@ -146,7 +146,7 @@ class AIUsageMonitorConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     @staticmethod
     @callback
     def async_get_options_flow(
-        _config_entry: config_entries.ConfigEntry,
+        config_entry: config_entries.ConfigEntry,
     ) -> AIUsageMonitorOptionsFlow:
         """Get the options flow."""
         flow = AIUsageMonitorOptionsFlow()
