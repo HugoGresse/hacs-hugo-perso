@@ -13,8 +13,7 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.data_entry_flow import FlowResult
 
 from .const import (
-    CONF_CLAUDE_COOKIE,
-    CONF_CLAUDE_ORG_ID,
+    CONF_CLAUDE_TOKEN,
     CONF_CURSOR_COOKIE,
     CONF_SCAN_INTERVAL,
     CURSOR_REQUEST_HEADERS,
@@ -89,10 +88,9 @@ class AIUsageMonitorConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         if user_input is not None:
             cursor_cookie = user_input.get(CONF_CURSOR_COOKIE, "").strip()
-            claude_cookie = user_input.get(CONF_CLAUDE_COOKIE, "").strip()
-            claude_org_id = user_input.get(CONF_CLAUDE_ORG_ID, "").strip()
+            claude_token = user_input.get(CONF_CLAUDE_TOKEN, "").strip()
 
-            if not cursor_cookie and not claude_cookie:
+            if not cursor_cookie and not claude_token:
                 errors["base"] = "no_services"
             else:
                 # Test Cursor cookie if provided
@@ -109,8 +107,7 @@ class AIUsageMonitorConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         title="AI Usage Monitor",
                         data={
                             CONF_CURSOR_COOKIE: cursor_cookie,
-                            CONF_CLAUDE_COOKIE: claude_cookie,
-                            CONF_CLAUDE_ORG_ID: claude_org_id,
+                            CONF_CLAUDE_TOKEN: claude_token,
                             CONF_SCAN_INTERVAL: user_input.get(
                                 CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL
                             ),
@@ -127,12 +124,8 @@ class AIUsageMonitorConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         default=existing.get(CONF_CURSOR_COOKIE, ""),
                     ): str,
                     vol.Optional(
-                        CONF_CLAUDE_COOKIE,
-                        default=existing.get(CONF_CLAUDE_COOKIE, ""),
-                    ): str,
-                    vol.Optional(
-                        CONF_CLAUDE_ORG_ID,
-                        default=existing.get(CONF_CLAUDE_ORG_ID, ""),
+                        CONF_CLAUDE_TOKEN,
+                        default=existing.get(CONF_CLAUDE_TOKEN, ""),
                     ): str,
                     vol.Optional(
                         CONF_SCAN_INTERVAL,
@@ -172,10 +165,9 @@ class AIUsageMonitorOptionsFlow(config_entries.OptionsFlow):
 
         if user_input is not None:
             cursor_cookie = user_input.get(CONF_CURSOR_COOKIE, "").strip()
-            claude_cookie = user_input.get(CONF_CLAUDE_COOKIE, "").strip()
-            claude_org_id = user_input.get(CONF_CLAUDE_ORG_ID, "").strip()
+            claude_token = user_input.get(CONF_CLAUDE_TOKEN, "").strip()
 
-            if not cursor_cookie and not claude_cookie:
+            if not cursor_cookie and not claude_token:
                 errors["base"] = "no_services"
             else:
                 if cursor_cookie:
@@ -188,8 +180,7 @@ class AIUsageMonitorOptionsFlow(config_entries.OptionsFlow):
                         title="",
                         data={
                             CONF_CURSOR_COOKIE: cursor_cookie,
-                            CONF_CLAUDE_COOKIE: claude_cookie,
-                            CONF_CLAUDE_ORG_ID: claude_org_id,
+                            CONF_CLAUDE_TOKEN: claude_token,
                             CONF_SCAN_INTERVAL: user_input.get(
                                 CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL
                             ),
@@ -208,12 +199,8 @@ class AIUsageMonitorOptionsFlow(config_entries.OptionsFlow):
                         default=form_defaults.get(CONF_CURSOR_COOKIE, ""),
                     ): str,
                     vol.Optional(
-                        CONF_CLAUDE_COOKIE,
-                        default=form_defaults.get(CONF_CLAUDE_COOKIE, ""),
-                    ): str,
-                    vol.Optional(
-                        CONF_CLAUDE_ORG_ID,
-                        default=form_defaults.get(CONF_CLAUDE_ORG_ID, ""),
+                        CONF_CLAUDE_TOKEN,
+                        default=form_defaults.get(CONF_CLAUDE_TOKEN, ""),
                     ): str,
                     vol.Optional(
                         CONF_SCAN_INTERVAL,
