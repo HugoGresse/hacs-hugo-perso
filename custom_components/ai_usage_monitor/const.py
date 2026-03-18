@@ -3,14 +3,13 @@
 DOMAIN = "ai_usage_monitor"
 
 CONF_CURSOR_COOKIE = "cursor_cookie"
-CONF_CLAUDE_COOKIE = "claude_cookie"
-CONF_CLAUDE_ORG_ID = "claude_org_id"
+CONF_CLAUDE_TOKEN = "claude_token"
 CONF_SCAN_INTERVAL = "scan_interval"
 
 DEFAULT_SCAN_INTERVAL = 300  # 5 minutes
 
 CURSOR_USAGE_URL = "https://cursor.com/api/dashboard/get-current-period-usage"
-CLAUDE_USAGE_URL = "https://claude.ai/api/usage"
+CLAUDE_USAGE_URL = "https://api.anthropic.com/api/oauth/usage"
 
 CURSOR_REQUEST_HEADERS = {
     "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:115.0) Gecko/20100101 Firefox/115.0",
@@ -24,4 +23,8 @@ CURSOR_REQUEST_HEADERS = {
     "Sec-Fetch-Dest": "empty",
     "Sec-Fetch-Mode": "cors",
     "Sec-Fetch-Site": "same-origin",
+}
+
+CLAUDE_REQUEST_HEADERS = {
+    "anthropic-beta": "oauth-2025-04-20",
 }

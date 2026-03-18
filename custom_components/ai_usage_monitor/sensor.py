@@ -22,13 +22,13 @@ from homeassistant.helpers.update_coordinator import (
 )
 
 from .const import (
-    CONF_CLAUDE_COOKIE,
-    CONF_CLAUDE_ORG_ID,
+    CLAUDE_REQUEST_HEADERS,
+    CLAUDE_USAGE_URL,
+    CONF_CLAUDE_TOKEN,
     CONF_CURSOR_COOKIE,
     CONF_SCAN_INTERVAL,
     CURSOR_REQUEST_HEADERS,
     CURSOR_USAGE_URL,
-    CLAUDE_USAGE_URL,
     DEFAULT_SCAN_INTERVAL,
     DOMAIN,
 )
@@ -51,26 +51,19 @@ async def _fetch_cursor_usage(cookie: str) -> dict[str, Any]:
             return await resp.json(content_type=None)
 
 
-async def _fetch_claude_usage(cookie: str, org_id: str) -> dict[str, Any]:
-    """Fetch Claude usage data from the internal API.
+async def _fetch_claude_usage(token: str) -> dict[str, Any]:
+    """Fetch Claude usage data from the Anthropic OAuth API.
 
-    This uses the internal claude.ai API which requires a valid session cookie.
-    The user needs to extract their sessionKey cookie from claude.ai.
+    This uses the Anthropic OAuth usage endpoint which requires a valid
+    Bearer token obtained via OAuth.
     """
     async with aiohttp.ClientSession() as session:
         headers = {
-            "Content-Type": "application/json",
-            "Cookie": cookie,
-            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:149.0) Gecko/20100101 Firefox/149.0",
+            **CLAUDE_REQUEST_HEADERS,
+            "Authorization": f"Bearer {token}",
         }
-
-        # Try the bootstrap endpoint first to get usage info
-        url = CLAUDE_USAGE_URL
-        if org_id:
-            url = f"https://claude.ai/api/organizations/{org_id}/usage"
-
         async with session.get(
-            url,
+            CLAUDE_USAGE_URL,
             headers=headers,
             timeout=aiohttp.ClientTimeout(total=15),
         ) as resp:
@@ -104,7 +97,7 @@ class ClaudeUsageCoordinator(DataUpdateCoordinator):
     """Coordinator for Claude usage data."""
 
     def __init__(
-        self, hass: HomeAssistant, cookie: str, org_id: str, interval: int
+        self, hass: HomeAssistant, token: str, interval: int
     ) -> None:
         """Initialize coordinator."""
         super().__init__(
@@ -113,13 +106,12 @@ class ClaudeUsageCoordinator(DataUpdateCoordinator):
             name="Claude Usage",
             update_interval=timedelta(seconds=interval),
         )
-        self._cookie = cookie
-        self._org_id = org_id
+        self._token = token
 
     async def _async_update_data(self) -> dict[str, Any]:
         """Fetch data from Claude API."""
         try:
-            return await _fetch_claude_usage(self._cookie, self._org_id)
+            return await _fetch_claude_usage(self._token)
         except Exception as err:
             raise UpdateFailed(f"Error fetching Claude usage: {err}") from err
 
@@ -156,21 +148,23 @@ async def async_setup_entry(
         )
 
     # --- Claude sensors ---
-    claude_cookie = config.get(CONF_CLAUDE_COOKIE, "")
-    if claude_cookie:
-        claude_org_id = config.get(CONF_CLAUDE_ORG_ID, "")
-        claude_coordinator = ClaudeUsageCoordinator(
-            hass, claude_cookie, claude_org_id, interval
-        )
+    claude_token = config.get(CONF_CLAUDE_TOKEN, "")
+    if claude_token:
+        claude_coordinator = ClaudeUsageCoordinator(hass, claude_token, interval)
         await claude_coordinator.async_refresh()
         if claude_coordinator.last_exception:
             _LOGGER.warning(
                 "Could not fetch initial Claude usage data: %s. "
-                "The internal API may have changed. Check your cookie and org ID. "
-                "Sensor will be unavailable until the next scheduled update.",
+                "Check your Bearer token. "
+                "Sensors will be unavailable until the next scheduled update.",
                 claude_coordinator.last_exception,
             )
-        entities.append(ClaudeUsageSensor(claude_coordinator, entry))
+        entities.extend(
+            [
+                ClaudeFiveHourUsageSensor(claude_coordinator, entry),
+                ClaudeSevenDayUsageSensor(claude_coordinator, entry),
+            ]
+        )
 
     async_add_entities(entities, True)
 
@@ -215,7 +209,7 @@ class CursorAutoUsageSensor(CursorBaseSensor):
     def __init__(self, coordinator: CursorUsageCoordinator, entry: ConfigEntry) -> None:
         """Initialize."""
         super().__init__(
-            coordinator, entry, "auto_percent", "Auto Usage", "mdi:robot-outline"
+            coordinator, entry, "auto_percent", "Cursor Auto Usage", "mdi:robot-outline"
         )
 
     @property
@@ -231,7 +225,6 @@ class CursorAutoUsageSensor(CursorBaseSensor):
     def extra_state_attributes(self) -> dict[str, Any]:
         """Return extra attributes."""
         data = self.coordinator.data or {}
-        usage = data.get("planUsage", {})
         return {
             "display_message": data.get("autoModelSelectedDisplayMessage", ""),
         }
@@ -243,7 +236,7 @@ class CursorApiUsageSensor(CursorBaseSensor):
     def __init__(self, coordinator: CursorUsageCoordinator, entry: ConfigEntry) -> None:
         """Initialize."""
         super().__init__(
-            coordinator, entry, "api_percent", "API Usage", "mdi:api"
+            coordinator, entry, "api_percent", "Cursor API Usage", "mdi:api"
         )
 
     @property
@@ -270,7 +263,7 @@ class CursorTotalUsageSensor(CursorBaseSensor):
     def __init__(self, coordinator: CursorUsageCoordinator, entry: ConfigEntry) -> None:
         """Initialize."""
         super().__init__(
-            coordinator, entry, "total_percent", "Total Usage", "mdi:chart-donut"
+            coordinator, entry, "total_percent", "Cursor Total Usage", "mdi:chart-donut"
         )
 
     @property
@@ -312,7 +305,7 @@ class CursorSpendSensor(CursorBaseSensor):
             coordinator,
             entry,
             "total_spend",
-            "Total Spend",
+            "Cursor Total Spend",
             "mdi:currency-usd",
             "USD",
         )
@@ -334,12 +327,8 @@ class CursorSpendSensor(CursorBaseSensor):
 # =============================================================================
 
 
-class ClaudeUsageSensor(CoordinatorEntity, SensorEntity):
-    """Sensor for Claude usage.
-
-    The exact shape of the response depends on the internal API version.
-    This sensor attempts to extract a usage percentage from the response.
-    """
+class ClaudeBaseSensor(CoordinatorEntity, SensorEntity):
+    """Base sensor for Claude usage."""
 
     _attr_has_entity_name = True
     _attr_state_class = SensorStateClass.MEASUREMENT
@@ -347,12 +336,17 @@ class ClaudeUsageSensor(CoordinatorEntity, SensorEntity):
     _attr_icon = "mdi:head-snowflake-outline"
 
     def __init__(
-        self, coordinator: ClaudeUsageCoordinator, entry: ConfigEntry
+        self,
+        coordinator: ClaudeUsageCoordinator,
+        entry: ConfigEntry,
+        key: str,
+        name: str,
     ) -> None:
-        """Initialize."""
+        """Initialize sensor."""
         super().__init__(coordinator)
-        self._attr_name = "Claude Usage"
-        self._attr_unique_id = f"{entry.entry_id}_claude_usage"
+        self._key = key
+        self._attr_name = name
+        self._attr_unique_id = f"{entry.entry_id}_claude_{key}"
         self._attr_device_info = {
             "identifiers": {(DOMAIN, entry.entry_id)},
             "name": "AI Providers",
@@ -361,41 +355,45 @@ class ClaudeUsageSensor(CoordinatorEntity, SensorEntity):
 
     @property
     def native_value(self) -> float | None:
-        """Try to extract usage percentage from the response."""
+        """Return the utilization percentage for this window."""
         data = self.coordinator.data
         if not data:
             return None
-
-        # The internal API response format may vary.
-        # Common patterns to look for:
-        for key in ("percentUsed", "usage_percent", "percent_used", "usagePercent"):
-            if key in data:
-                return round(float(data[key]), 2)
-
-        # If the response has a nested structure
-        if isinstance(data, dict):
-            for _, v in data.items():
-                if isinstance(v, dict):
-                    for key in (
-                        "percentUsed",
-                        "usage_percent",
-                        "percent_used",
-                        "usagePercent",
-                    ):
-                        if key in v:
-                            return round(float(v[key]), 2)
-
+        window = data.get(self._key, {})
+        utilization = window.get("utilization")
+        if utilization is not None:
+            return round(float(utilization), 2)
         return None
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
-        """Return the raw API response as attributes for debugging."""
+        """Return resets_at as an attribute."""
         data = self.coordinator.data
         if not data:
             return {}
-        # Flatten top-level keys as attributes (limit to safe types)
+        window = data.get(self._key, {})
         attrs: dict[str, Any] = {}
-        for k, v in data.items():
-            if isinstance(v, (str, int, float, bool)):
-                attrs[k] = v
+        resets_at = window.get("resets_at")
+        if resets_at is not None:
+            attrs["resets_at"] = resets_at
         return attrs
+
+
+class ClaudeFiveHourUsageSensor(ClaudeBaseSensor):
+    """Sensor for Claude 5-hour usage utilization."""
+
+    def __init__(
+        self, coordinator: ClaudeUsageCoordinator, entry: ConfigEntry
+    ) -> None:
+        """Initialize."""
+        super().__init__(coordinator, entry, "five_hour", "Claude Five Hour Usage")
+
+
+class ClaudeSevenDayUsageSensor(ClaudeBaseSensor):
+    """Sensor for Claude 7-day usage utilization."""
+
+    def __init__(
+        self, coordinator: ClaudeUsageCoordinator, entry: ConfigEntry
+    ) -> None:
+        """Initialize."""
+        super().__init__(coordinator, entry, "seven_day", "Claude Seven Day Usage")
